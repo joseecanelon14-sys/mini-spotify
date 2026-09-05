@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Spotify PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #181818;
+            --accent-color: #1db954;
+            --text-color: #ffffff;
+            --text-secondary: #b3b3b3;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding-bottom: 120px;
+        }
+        header {
+            padding: 20px;
+            background-color: var(--surface-color);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--accent-color); }
+        .search-box {
+            display: flex;
+            gap: 10px;
+        }
+        input {
+            flex: 1;
+            padding: 12px 15px;
+            border-radius: 25px;
+            border: none;
+            background: #2a2a2a;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+        }
+        .container {
+            padding: 20px;
+        }
+        h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .song-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .song-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface-color);
+            padding: 12px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .song-item:active { background: #282828; }
+        .song-info h4 { margin: 0 0 5px 0; font-size: 1rem; }
+        .song-info p { margin: 0; font-size: 0.8rem; color: var(--text-secondary); }
+        
+        .player-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #181818;
+            border-top: 1px solid #282828;
+            padding: 15px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-sizing: border-box;
+            z-index: 100;
+        }
+        .player-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        audio { width: 100%; }
+        .offline-badge {
+            font-size: 0.7rem;
+            background: #222;
+            color: var(--accent-color);
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Spotify Web Lite</h1>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Buscar canciones o artistas..." oninput="filtrarCanciones()">
+        </div>
+    </header>
+
+    <div class="container">
+        <h3 id="sectionTitle">Sugerencias Intuitivas</h3>
+        <div class="song-list" id="songList"></div>
+    </div>
+
+    <div class="player-bar">
+        <div class="player-details">
+            <div>
+                <strong id="currentTitle">Selecciona una canción</strong>
+                <p id="currentArtist" style="margin:0; font-size:0.8rem; color:var(--text-secondary);">-</p>
+            </div>
+            <span class="offline-badge">Caché Offline OK</span>
+        </div>
+        <audio id="audioPlayer" controls></audio>
+    </div>
+
+    <script>
+        const playlist = [
+            { id: 1, title: "Lofi Study Beats", artist: "ChillAF", genre: "lofi", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+            { id: 2, title: "Ambient Space", artist: "Cosmic Flow", genre: "ambient", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+            { id: 3, title: "Jazz Club Session", artist: "The Midnight Trio", genre: "jazz", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+            { id: 4, title: "Electric Vibes", artist: "Neon Pulse", genre: "electronic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" }
+        ];
+
+        let historialBusquedas = JSON.parse(localStorage.getItem('historial_spotify')) || [];
+
+        function registrarInteraccion(termino) {
+            termino = termino.toLowerCase().trim();
+            if (termino && !historialBusquedas.includes(termino)) {
+                historialBusquedas.unshift(termino);
+                if (historialBusquedas.length > 5) historialBusquedas.pop();
+                localStorage.setItem('historial_spotify', JSON.stringify(historialBusquedas));
+            }
+        }
+
+        function cargarSugerenciasIntuitivas() {
+            document.getElementById('sectionTitle').innerText = "Sugerencias para ti";
+            const listContainer = document.getElementById('songList');
+            listContainer.innerHTML = '';
+
+            let sugeridas = playlist;
+            if (historialBusquedas.length > 0) {
+                sugeridas = playlist.filter(song => 
+                    historialBusquedas.some(term => 
+                        song.title.toLowerCase().includes(term) || 
+                        song.artist.toLowerCase().includes(term) ||
+                        song.genre.toLowerCase().includes(term)
+                    )
+                );
+                if (sugeridas.length === 0) sugeridas = playlist;
+            }
+
+            sugeridas.forEach(song => {
+                const item = document.createElement('div');
+                item.className = 'song-item';
+                item.innerHTML = `
+                    <div class="song-info">
+                        <h4>${song.title}</h4>
+                        <p>${song.artist} • <span style="color:var(--accent-color)">Basado en tus gustos</span></p>
+                    </div>
+                    <div style="background:var(--accent-color); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold; font-size:0.8rem;">▶</div>
+                `;
+                item.onclick = () => reproducirCancion(song);
+                listContainer.appendChild(item);
+            });
+        }
+
+        function reproducirCancion(song) {
+            document.getElementById('currentTitle').innerText = song.title;
+            document.getElementById('currentArtist').innerText = song.artist;
+            
+            const player = document.getElementById('audioPlayer');
+            player.src = song.url;
+            player.play().catch(err => console.log("Reproducción pausada por políticas del navegador:", err));
+        }
+
+        function filtrarCanciones() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            
+            if (query.length > 1) {
+                registrarInteraccion(query);
+            }
+
+            const filtradas = playlist.filter(s => 
+                s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query) || s.genre.toLowerCase().includes(query)
+            );
+            
+            if (query === "") {
+                cargarSugerenciasIntuitivas();
+            } else {
+                document.getElementById('sectionTitle').innerText = "Resultados de búsqueda";
+                cargarListaResultados(filtradas);
+            }
+        }
+
+        function cargarListaResultados(canciones) {
+            const listContainer = document.getElementById('songList');
+            listContainer.innerHTML = '';
+            
+            if (canciones.length === 0) {
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se encontraron canciones.</p>';
+                return;
+            }
+
+            canciones.forEach(song => {
+                const item = document.createElement('div');
+                item.className = 'song-item';
+                item.innerHTML = `
+                    <div class="song-info">
+                        <h4>${song.title}</h4>
+                        <p>${song.artist}</p>
+                    </div>
+                    <div style="background:var(--accent-color); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold; font-size:0.8rem;">▶</div>
+                `;
+                item.onclick = () => reproducirCancion(song);
+                listContainer.appendChild(item);
+            });
+        }
+
+        cargarSugerenciasIntuitivas();
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log("Service Worker registrado:", reg.scope))
+                    .catch(err => console.error("Error Service Worker:", err));
+            });
+        }
+    </script>
+</body>
+</html>
+
