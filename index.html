@@ -152,19 +152,19 @@
     <header>
         <h1>Spotify Web Lite</h1>
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Buscar cualquier música..." oninput="filtrarCanciones()">
+            <input type="text" id="searchInput" placeholder="Buscar artista, álbum o canción..." oninput="filtrarCanciones()">
         </div>
         <div class="nav-tabs">
             <button class="tab-btn active" id="tabHome" onclick="cambiarPestana('home')">Inicio / Sugerencias</button>
             <button class="tab-btn" id="tabHistory" onclick="cambiarPestana('history')">Historial Escuchadas</button>
         </div>
         <div class="categories-bar">
-            <span class="cat-chip" onclick="filtrarPorCategoria('pop')">Pop</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('rock')">Rock</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('electronic')">Electronic</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('jazz')">Jazz</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('lofi')">Lofi</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('classical')">Classical</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('Pop')">Pop</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('Rock')">Rock</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('Electronic')">Electronic</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('Jazz')">Jazz</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('Lofi')">Lofi</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('Classical')">Classical</span>
         </div>
     </header>
 
@@ -222,14 +222,14 @@
         async function cargarSugerenciasIntuitivas() {
             if (pestanaActual !== 'home') return;
             document.getElementById('sectionTitle').innerText = "Música sugerida para ti";
-            let termino = busquedasRecientes.length > 0 ? busquedasRecientes[0] : "pop";
-            buscarMusicaJamendo(termino, "Sugeridas basadas en tus gustos");
+            let termino = busquedasRecientes.length > 0 ? busquedasRecientes[0] : "Pop";
+            buscarMusica(termino, "Sugeridas basadas en tus gustos");
         }
 
         function filtrarPorCategoria(categoria) {
             document.getElementById('searchInput').value = '';
             cambiarPestana('home');
-            buscarMusicaJamendo(categoria, `Categoría: ${categoria.toUpperCase()}`);
+            buscarMusica(categoria, `Categoría: ${categoria}`);
         }
 
         function mostrarHistorial() {
@@ -237,19 +237,25 @@
             renderizarLista(historialReproduccion, "No tienes canciones en tu historial aún. ¡Empieza a reproducir música!");
         }
 
-        async function buscarMusicaJamendo(query, tituloSeccion) {
+        async function buscarMusica(query, tituloSeccion) {
             if (pestanaActual !== 'home') return;
             document.getElementById('sectionTitle').innerText = tituloSeccion;
             const listContainer = document.getElementById('songList');
             listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando música...</p>';
 
             try {
-                const clientId = '997d9961';
-                const response = await fetch(`https://api.jamendo.com/v3.0/tracks/?client_id=${clientId}&format=json&limit=30&search=${encodeURIComponent(query)}&audioformat=mp32`);
+                const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=30`);
                 const data = await response.json();
 
                 if (pestanaActual !== 'home') return;
-                renderizarLista(data.results ? data.results.map(s => ({ title: s.name, artist: s.artist_name, url: s.audio })) : []);
+
+                const cancionesFormateadas = data.results ? data.results.map(s => ({
+                    title: s.trackName,
+                    artist: s.artistName,
+                    url: s.previewUrl
+                })).filter(s => s.url) : [];
+
+                renderizarLista(cancionesFormateadas);
             } catch (error) {
                 listContainer.innerHTML = '<p style="color:var(--text-secondary);">Error al conectar con el servidor.</p>';
             }
@@ -311,7 +317,7 @@
 
             timerBusqueda = setTimeout(() => {
                 if (pestanaActual === 'history') cambiarPestana('home');
-                buscarMusicaJamendo(query, "Resultados de búsqueda");
+                buscarMusica(query, "Resultados de búsqueda");
             }, 500);
         }
 
