@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify Web Lite - Reproductor Integrado</title>
+    <title>Spotify Web Lite</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -17,7 +17,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding-bottom: 120px;
+            padding-bottom: 140px;
         }
         header {
             padding: 20px;
@@ -72,6 +72,7 @@
             color: black;
             font-weight: bold;
             font-size: 0.9rem;
+            flex-shrink: 0;
         }
         
         .player-bar {
@@ -84,9 +85,6 @@
             padding: 10px 20px;
             box-sizing: border-box;
             z-index: 100;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
         iframe {
             width: 100%;
@@ -113,9 +111,8 @@
     </div>
 
     <div class="player-bar">
-        <div style="width: 100%; margin-bottom: 5px; font-size: 0.85rem; color: var(--text-secondary);" id="nowPlayingText">Reproductor activo</div>
-        <!-- Contenedor embebido nativo que reproduce la pista completa sin bloqueos CORS -->
-        <div id="playerContainer" style="width: 100%;">
+        <div style="margin-bottom: 5px; font-size: 0.85rem; color: var(--text-secondary);" id="nowPlayingText">Reproductor activo</div>
+        <div id="playerContainer">
             <p style="margin: 0; font-size: 0.8rem; color: #777;">Selecciona una canción de la lista</p>
         </div>
     </div>
@@ -196,14 +193,13 @@
         }
 
         function reproducirCancion(song) {
-            document.getElementById('nowPlayingTextinnerHTML').innerText = `Reproduciendo: ${song.title}`;
+            document.getElementById('nowPlayingText').innerText = `Reproduciendo: ${song.title}`;
             
-            // Usamos un reproductor integrado optimizado para web móvil que elude las restricciones de red
             const playerContainer = document.getElementById('playerContainer');
             playerContainer.innerHTML = `
-                <iframe src="https://www.youtube-nocookie.com/embed/${song.videoId}?autoplay=1&enablejsapi=1" 
-                        allow="autoplay" 
-                        title="${song.title}">
+                <iframe src="https://www.youtube-nocookie.com/embed/${song.videoId}?autoplay=1" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen>
                 </iframe>
             `;
         }
