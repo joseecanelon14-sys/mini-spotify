@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Spotify PWA</title>
+    <title>Mini Spotify PWA - YouTube Stream</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -18,7 +18,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding-bottom: 130px;
+            padding-bottom: 140px;
         }
         header {
             padding: 20px;
@@ -145,31 +145,36 @@
             border-radius: 4px;
             border: 1px solid var(--accent-color);
         }
+        .loading-spinner {
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            display: none;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>Spotify Web Lite</h1>
+        <h1>Spotify Web Lite (YouTube Stream)</h1>
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Buscar artista, álbum o canción..." oninput="filtrarCanciones()">
+            <input type="text" id="searchInput" placeholder="Busca cualquier canción o artista comercial..." oninput="filtrarCanciones()">
         </div>
         <div class="nav-tabs">
             <button class="tab-btn active" id="tabHome" onclick="cambiarPestana('home')">Inicio / Sugerencias</button>
             <button class="tab-btn" id="tabHistory" onclick="cambiarPestana('history')">Historial Escuchadas</button>
         </div>
         <div class="categories-bar">
-            <span class="cat-chip" onclick="filtrarPorCategoria('Pop')">Pop</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('Rock')">Rock</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('Electronic')">Electronic</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('Jazz')">Jazz</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('Lofi')">Lofi</span>
-            <span class="cat-chip" onclick="filtrarPorCategoria('Classical')">Classical</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('Bad Bunny hits')">Reggaeton</span>
+            <span class="cat-chip" onclick="filtrarPorCategory('Top Pop songs')">Pop</span>
+            <span class="cat-chip" onclick="filtrarPorCategory('Rock classics')">Rock</span>
+            <span class="cat-chip" onclick="filtrarPorCategory('Electronic music')">Electronic</span>
+            <span class="cat-chip" onclick="filtrarPorCategory('Lofi hip hop beats')">Lofi</span>
         </div>
     </header>
 
     <div class="container">
-        <h3 id="sectionTitle">Música sugerida para ti</h3>
+        <h3 id="sectionTitle">Música comercial sugerida</h3>
         <div class="song-list" id="songList"></div>
     </div>
 
@@ -179,7 +184,10 @@
                 <strong id="currentTitle">Selecciona una canción</strong>
                 <p id="currentArtist" style="margin:0; font-size:0.8rem; color:var(--text-secondary);">-</p>
             </div>
-            <span class="offline-badge">Caché 15 Días OK</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="loadingAudio" class="loading-spinner">Cargando audio...</span>
+                <span class="offline-badge">YouTube Stream</span>
+            </div>
         </div>
         <audio id="audioPlayer" controls></audio>
     </div>
@@ -202,7 +210,7 @@
         }
 
         function registrarHistorialReproduccion(song) {
-            historialReproduccion = historialReproduccion.filter(s => s.url !== song.url);
+            historialReproduccion = historialReproduccion.filter(s => s.videoId !== song.videoId);
             historialReproduccion.unshift(song);
             if (historialReproduccion.length > 50) historialReproduccion.pop();
             localStorage.setItem('historial_reproducidas', JSON.stringify(historialReproduccion));
@@ -210,23 +218,17 @@
 
         async function descargarCancion(event, song) {
             event.stopPropagation();
-            try {
-                const cache = await caches.open('music-cache-v15days');
-                await cache.add(song.url);
-                alert(`¡"${song.title}" descargada con éxito para modo offline!`);
-            } catch (e) {
-                alert("No se pudo descargar la canción. Verifica tu conexión.");
-            }
+            alert("Para descargar canciones en streaming de YouTube de forma offline, asegúrate de mantener abierta la PWA con conexión.");
         }
 
         async function cargarSugerenciasIntuitivas() {
             if (pestanaActual !== 'home') return;
-            document.getElementById('sectionTitle').innerText = "Música sugerida para ti";
-            let termino = busquedasRecientes.length > 0 ? busquedasRecientes[0] : "Pop";
-            buscarMusica(termino, "Sugeridas basadas en tus gustos");
+            document.getElementById('sectionTitle').innerText = "Música comercial sugerida";
+            let termino = busquedasRecientes.length > 0 ? busquedasRecientes[0] : "Top hits 2026";
+            buscarMusica(termino, "Sugeridas basadas en tus búsquedas");
         }
 
-        function filtrarPorCategoria(categoria) {
+        function filtrarPorCategory(categoria) {
             document.getElementById('searchInput').value = '';
             cambiarPestana('home');
             buscarMusica(categoria, `Categoría: ${categoria}`);
@@ -241,23 +243,38 @@
             if (pestanaActual !== 'home') return;
             document.getElementById('sectionTitle').innerText = tituloSeccion;
             const listContainer = document.getElementById('songList');
-            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando música...</p>';
+            listContainer.innerHTML = '<p style="color:var::text-secondary; color: var(--text-secondary);">Buscando en YouTube...</p>';
 
             try {
-                const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=30`);
+                // Usamos la API pública de Invidious para buscar videos musicales sin restricciones
+                const response = await fetch(`https://invidious.io.lol/api/v1/search?q=${encodeURIComponent(query)}&type=video`);
                 const data = await response.json();
 
                 if (pestanaActual !== 'home') return;
 
-                const cancionesFormateadas = data.results ? data.results.map(s => ({
-                    title: s.trackName,
-                    artist: s.artistName,
-                    url: s.previewUrl
-                })).filter(s => s.url) : [];
+                const cancionesFormateadas = data.filter(item => item.type === 'video').map(item => ({
+                    videoId: item.videoId,
+                    title: item.title,
+                    artist: item.author,
+                    duration: item.lengthSeconds
+                }));
 
                 renderizarLista(cancionesFormateadas);
             } catch (error) {
-                listContainer.innerHTML = '<p style="color:var(--text-secondary);">Error al conectar con el servidor.</p>';
+                // Fallback a otra instancia de Invidious si la primera falla
+                try {
+                    const responseAlt = await fetch(`https://vid.puffyan.us/api/v1/search?q=${encodeURIComponent(query)}&type=video`);
+                    const dataAlt = await responseAlt.json();
+                    const cancionesFormateadas = dataAlt.filter(item => item.type === 'video').map(item => ({
+                        videoId: item.videoId,
+                        title: item.title,
+                        artist: item.author,
+                        duration: item.lengthSeconds
+                    }));
+                    renderizarLista(cancionesFormateadas);
+                } catch (err) {
+                    listContainer.innerHTML = '<p style="color:var(--text-secondary);">Error al conectar con los servidores de búsqueda de YouTube.</p>';
+                }
             }
         }
 
@@ -279,24 +296,49 @@
                         <p>${song.artist}</p>
                     </div>
                     <div class="song-actions">
-                        <button class="action-btn" title="Descargar para modo offline" onclick='descargarCancion(event, ${JSON.stringify(song)})'>📥</button>
+                        <button class="action-btn" title="Opciones" onclick='descargarCancion(event, ${JSON.stringify(song)})'>⭐</button>
                         <button class="action-btn play" title="Reproducir">▶</button>
                     </div>
                 `;
-                item.onclick = () => reproducirCancion(song);
+                item.onclick = () => obtenerAudioYReproducir(song);
                 listContainer.appendChild(item);
             });
         }
 
-        function reproducirCancion(song) {
+        async function obtenerAudioYReproducir(song) {
             document.getElementById('currentTitle').innerText = song.title;
             document.getElementById('currentArtist').innerText = song.artist;
-            
-            const player = document.getElementById('audioPlayer');
-            player.src = song.url;
-            player.play().catch(err => console.log("Reproducción pausada:", err));
+            document.getElementById('loadingAudio').style.display = 'inline';
 
-            registrarHistorialReproduccion(song);
+            try {
+                // Consultamos el detalle del video en Invidious para extraer el enlace directo de audio puro
+                const response = await fetch(`https://invidious.io.lol/api/v1/videos/${song.videoId}`);
+                const data = await response.json();
+
+                // Buscamos formato de audio adaptable (adaptiveFormats o adaptiveStreams)
+                let audioFormats = data.adaptiveFormats ? data.adaptiveFormats.filter(f => f.type && f.type.includes('audio')) : [];
+                
+                if (audioFormats.length === 0 && data.formatStreams) {
+                    audioFormats = data.formatStreams;
+                }
+
+                if (audioFormats.length > 0) {
+                    // Tomamos el mejor flujo de audio disponible
+                    const streamUrl = audioFormats[0].url;
+                    
+                    const player = document.getElementById('audioPlayer');
+                    player.src = streamUrl;
+                    player.play().catch(err => console.log("Error al reproducir audio:", err));
+                    
+                    registrarHistorialReproduccion(song);
+                } else {
+                    alert("No se pudo extraer el flujo de audio para este video.");
+                }
+            } catch (e) {
+                alert("Error al procesar el flujo de audio de YouTube.");
+            } finally {
+                document.getElementById('loadingAudio').style.display = 'none';
+            }
         }
 
         let timerBusqueda;
@@ -318,7 +360,7 @@
             timerBusqueda = setTimeout(() => {
                 if (pestanaActual === 'history') cambiarPestana('home');
                 buscarMusica(query, "Resultados de búsqueda");
-            }, 500);
+            }, 600);
         }
 
         cargarSugerenciasIntuitivas();
