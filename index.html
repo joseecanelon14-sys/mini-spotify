@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify Web Lite - Streaming Completo</title>
+    <title>Spotify Web Lite - Multi-Server</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -186,7 +186,7 @@
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="loadingAudio" class="loading-spinner">Cargando audio...</span>
-                <span class="offline-badge">Stream Activo</span>
+                <span class="offline-badge">Multi-Server Active</span>
             </div>
         </div>
         <audio id="audioPlayer" controls></audio>
@@ -197,31 +197,49 @@
         let historialReproduccion = JSON.parse(localStorage.getItem('historial_reproducidas')) || [];
         let busquedasRecientes = JSON.parse(localStorage.getItem('historial_busquedas')) || [];
 
-        // Lista actualizada y ampliada de instancias activas de Piped
+        // Lista masiva de servidores públicos de Piped disponibles a nivel mundial
         const PIPED_INSTANCES = [
+            'https://pipedapi.kavin.rocks',
             'https://api.piped.private.coffee',
             'https://pipedapi.adminforge.de',
             'https://api.piped.projectsegfau.lt',
-            'https://pipedapi.kavin.rocks'
+            'https://piped-api.privacy.com.de',
+            'https://pipedapi.leptons.xyz',
+            'https://piped-api.lunar.icu',
+            'https://ytapi.dc09.ru',
+            'https://pipedapi.tokhmi.xyz',
+            'https://pipedapi.moomoo.me',
+            'https://pipedapi.syncpundit.io',
+            'https://api-piped.mha.fi',
+            'https://pipedapi.rivo.lol',
+            'https://api.piped.yt',
+            'https://pipedapi.smnz.de'
         ];
-        let currentInstanceIndex = 0;
 
+        // Función inteligente que prueba servidores en paralelo o rota de inmediato al siguiente si uno falla
         async function fetchWithFallback(endpoint) {
+            // Intentar con múltiples servidores en bucle rápido
             for (let i = 0; i < PIPED_INSTANCES.length; i++) {
-                let instance = PIPED_INSTANCES[(currentInstanceIndex + i) % PIPED_INSTANCES.length];
+                let instance = PIPED_INSTANCES[i];
                 try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 segundos de límite por servidor para agilizar
+
                     const response = await fetch(`${instance}${endpoint}`, {
+                        signal: controller.signal,
                         headers: { 'Accept': 'application/json' }
                     });
+                    
+                    clearTimeout(timeoutId);
+
                     if (response.ok) {
-                        currentInstanceIndex = (currentInstanceIndex + i) % PIPED_INSTANCES.length;
                         return await response.json();
                     }
                 } catch (e) {
-                    console.warn(`Instancia ${instance} no disponible, probando siguiente...`);
+                    // Pasa silenciosamente al siguiente servidor de la lista
                 }
             }
-            throw new Error("Todas las instancias están ocupadas.");
+            throw new Error("Todos los servidores están saturados en este momento.");
         }
 
         function cambiarPestana(tipo) {
@@ -265,7 +283,7 @@
             if (pestanaActual !== 'home') return;
             document.getElementById('sectionTitle').innerText = tituloSeccion;
             const listContainer = document.getElementById('songList');
-            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando música...</p>';
+            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando en múltiples servidores...</p>';
 
             try {
                 const data = await fetchWithFallback(`/search?q=${encodeURIComponent(query)}&filter=videos`);
@@ -285,7 +303,7 @@
 
                 renderizarLista(cancionesFormateadas);
             } catch (error) {
-                listContainer.innerHTML = '<p style="color:var(--text-secondary);">Error de conexión con los servidores. Vuelve a intentar en unos segundos.</p>';
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se pudo conectar con los servidores de búsqueda. Vuelve a intentar.</p>';
             }
         }
 
@@ -325,19 +343,18 @@
                 const audioStreams = data.audioStreams || [];
                 
                 if (audioStreams.length > 0) {
-                    // Seleccionamos el flujo de audio con mejor estabilidad
                     const streamUrl = audioStreams[0].url;
                     
                     const player = document.getElementById('audioPlayer');
                     player.src = streamUrl;
-                    player.play().catch(err => console.log("Reproducción bloqueada por autoplay:", err));
+                    player.play().catch(err => console.log("Reproducción automática bloqueada:", err));
                     
                     registrarHistorialReproduccion(song);
                 } else {
                     alert("No se encontró el flujo de audio para este archivo.");
                 }
             } catch (e) {
-                alert("No se pudo cargar la pista completa. Intenta con otra canción.");
+                alert("No se pudo cargar la pista. Intenta con otra canción de la lista.");
             } finally {
                 document.getElementById('loadingAudio').style.display = 'none';
             }
@@ -362,7 +379,7 @@
             timerBusqueda = setTimeout(() => {
                 if (pestanaActual === 'history') cambiarPestana('home');
                 buscarMusica(query, "Resultados de búsqueda");
-            }, 600);
+            }, 500);
         }
 
         cargarSugerenciasIntuitivas();
