@@ -18,7 +18,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding-bottom: 120px;
+            padding-bottom: 130px;
         }
         header {
             padding: 20px;
@@ -31,10 +31,7 @@
             z-index: 10;
         }
         h1 { margin: 0; font-size: 1.5rem; color: var(--accent-color); }
-        .search-box {
-            display: flex;
-            gap: 10px;
-        }
+        .search-box { display: flex; gap: 10px; }
         input {
             flex: 1;
             padding: 12px 15px;
@@ -45,15 +42,50 @@
             font-size: 1rem;
             outline: none;
         }
-        .container {
-            padding: 20px;
-        }
-        h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
-        .song-list {
+        .nav-tabs {
             display: flex;
-            flex-direction: column;
             gap: 10px;
+            padding: 0 20px;
+            margin-top: 5px;
+            overflow-x: auto;
+            white-space: nowrap;
         }
+        .tab-btn {
+            background: #2a2a2a;
+            border: none;
+            color: var(--text-secondary);
+            padding: 8px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .tab-btn.active {
+            background: var(--accent-color);
+            color: black;
+        }
+        .categories-bar {
+            display: flex;
+            gap: 8px;
+            padding: 10px 20px 0 20px;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .cat-chip {
+            background: #222;
+            border: 1px solid #333;
+            color: var(--text-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .cat-chip:hover { background: #333; }
+        .container { padding: 20px; }
+        h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .song-list { display: flex; flex-direction: column; gap: 10px; }
         .song-item {
             display: flex;
             align-items: center;
@@ -65,8 +97,29 @@
             transition: background 0.2s;
         }
         .song-item:active { background: #282828; }
-        .song-info h4 { margin: 0 0 5px 0; font-size: 1rem; }
-        .song-info p { margin: 0; font-size: 0.8rem; color: var(--text-secondary); }
+        .song-info { flex: 1; overflow: hidden; padding-right: 10px; }
+        .song-info h4 { margin: 0 0 5px 0; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .song-info p { margin: 0; font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .song-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .action-btn {
+            background: #2a2a2a;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            font-size: 0.9rem;
+        }
+        .action-btn.play { background: var(--accent-color); color: black; font-weight: bold; }
         
         .player-bar {
             position: fixed;
@@ -82,11 +135,7 @@
             box-sizing: border-box;
             z-index: 100;
         }
-        .player-details {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        .player-details { display: flex; justify-content: space-between; align-items: center; }
         audio { width: 100%; }
         .offline-badge {
             font-size: 0.7rem;
@@ -103,12 +152,24 @@
     <header>
         <h1>Spotify Web Lite</h1>
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Buscar canciones o artistas..." oninput="filtrarCanciones()">
+            <input type="text" id="searchInput" placeholder="Buscar cualquier música..." oninput="filtrarCanciones()">
+        </div>
+        <div class="nav-tabs">
+            <button class="tab-btn active" id="tabHome" onclick="cambiarPestana('home')">Inicio / Sugerencias</button>
+            <button class="tab-btn" id="tabHistory" onclick="cambiarPestana('history')">Historial Escuchadas</button>
+        </div>
+        <div class="categories-bar">
+            <span class="cat-chip" onclick="filtrarPorCategoria('pop')">Pop</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('rock')">Rock</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('electronic')">Electronic</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('jazz')">Jazz</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('lofi')">Lofi</span>
+            <span class="cat-chip" onclick="filtrarPorCategoria('classical')">Classical</span>
         </div>
     </header>
 
     <div class="container">
-        <h3 id="sectionTitle">Sugerencias Intuitivas</h3>
+        <h3 id="sectionTitle">Música sugerida para ti</h3>
         <div class="song-list" id="songList"></div>
     </div>
 
@@ -118,56 +179,103 @@
                 <strong id="currentTitle">Selecciona una canción</strong>
                 <p id="currentArtist" style="margin:0; font-size:0.8rem; color:var(--text-secondary);">-</p>
             </div>
-            <span class="offline-badge">Caché Offline OK</span>
+            <span class="offline-badge">Caché 15 Días OK</span>
         </div>
         <audio id="audioPlayer" controls></audio>
     </div>
 
     <script>
-        const playlist = [
-            { id: 1, title: "Lofi Study Beats", artist: "ChillAF", genre: "lofi", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-            { id: 2, title: "Ambient Space", artist: "Cosmic Flow", genre: "ambient", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
-            { id: 3, title: "Jazz Club Session", artist: "The Midnight Trio", genre: "jazz", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
-            { id: 4, title: "Electric Vibes", artist: "Neon Pulse", genre: "electronic", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3" }
-        ];
+        let pestanaActual = 'home';
+        let historialReproduccion = JSON.parse(localStorage.getItem('historial_reproducidas')) || [];
+        let busquedasRecientes = JSON.parse(localStorage.getItem('historial_busquedas')) || [];
 
-        let historialBusquedas = JSON.parse(localStorage.getItem('historial_spotify')) || [];
-
-        function registrarInteraccion(termino) {
-            termino = termino.toLowerCase().trim();
-            if (termino && !historialBusquedas.includes(termino)) {
-                historialBusquedas.unshift(termino);
-                if (historialBusquedas.length > 5) historialBusquedas.pop();
-                localStorage.setItem('historial_spotify', JSON.stringify(historialBusquedas));
+        function cambiarPestana(tipo) {
+            pestanaActual = tipo;
+            document.getElementById('tabHome').classList.toggle('active', tipo === 'home');
+            document.getElementById('tabHistory').classList.toggle('active', tipo === 'history');
+            
+            if (tipo === 'history') {
+                mostrarHistorial();
+            } else {
+                cargarSugerenciasIntuitivas();
             }
         }
 
-        function cargarSugerenciasIntuitivas() {
-            document.getElementById('sectionTitle').innerText = "Sugerencias para ti";
+        function registrarHistorialReproduccion(song) {
+            historialReproduccion = historialReproduccion.filter(s => s.url !== song.url);
+            historialReproduccion.unshift(song);
+            if (historialReproduccion.length > 50) historialReproduccion.pop();
+            localStorage.setItem('historial_reproducidas', JSON.stringify(historialReproduccion));
+        }
+
+        async function descargarCancion(event, song) {
+            event.stopPropagation();
+            try {
+                const cache = await caches.open('music-cache-v15days');
+                await cache.add(song.url);
+                alert(`¡"${song.title}" descargada con éxito para modo offline!`);
+            } catch (e) {
+                alert("No se pudo descargar la canción. Verifica tu conexión.");
+            }
+        }
+
+        async function cargarSugerenciasIntuitivas() {
+            if (pestanaActual !== 'home') return;
+            document.getElementById('sectionTitle').innerText = "Música sugerida para ti";
+            let termino = busquedasRecientes.length > 0 ? busquedasRecientes[0] : "pop";
+            buscarMusicaJamendo(termino, "Sugeridas basadas en tus gustos");
+        }
+
+        function filtrarPorCategoria(categoria) {
+            document.getElementById('searchInput').value = '';
+            cambiarPestana('home');
+            buscarMusicaJamendo(categoria, `Categoría: ${categoria.toUpperCase()}`);
+        }
+
+        function mostrarHistorial() {
+            document.getElementById('sectionTitle').innerText = "Historial de canciones escuchadas";
+            renderizarLista(historialReproduccion, "No tienes canciones en tu historial aún. ¡Empieza a reproducir música!");
+        }
+
+        async function buscarMusicaJamendo(query, tituloSeccion) {
+            if (pestanaActual !== 'home') return;
+            document.getElementById('sectionTitle').innerText = tituloSeccion;
+            const listContainer = document.getElementById('songList');
+            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando música...</p>';
+
+            try {
+                const clientId = '997d9961';
+                const response = await fetch(`https://api.jamendo.com/v3.0/tracks/?client_id=${clientId}&format=json&limit=30&search=${encodeURIComponent(query)}&audioformat=mp32`);
+                const data = await response.json();
+
+                if (pestanaActual !== 'home') return;
+                renderizarLista(data.results ? data.results.map(s => ({ title: s.name, artist: s.artist_name, url: s.audio })) : []);
+            } catch (error) {
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">Error al conectar con el servidor.</p>';
+            }
+        }
+
+        function renderizarLista(canciones, mensajeVacio = "No se encontraron canciones.") {
             const listContainer = document.getElementById('songList');
             listContainer.innerHTML = '';
-
-            let sugeridas = playlist;
-            if (historialBusquedas.length > 0) {
-                sugeridas = playlist.filter(song => 
-                    historialBusquedas.some(term => 
-                        song.title.toLowerCase().includes(term) || 
-                        song.artist.toLowerCase().includes(term) ||
-                        song.genre.toLowerCase().includes(term)
-                    )
-                );
-                if (sugeridas.length === 0) sugeridas = playlist;
+            
+            if (!canciones || canciones.length === 0) {
+                listContainer.innerHTML = `<p style="color:var(--text-secondary);">${mensajeVacio}</p>`;
+                return;
             }
 
-            sugeridas.forEach(song => {
+            canciones.forEach(song => {
                 const item = document.createElement('div');
                 item.className = 'song-item';
                 item.innerHTML = `
                     <div class="song-info">
                         <h4>${song.title}</h4>
-                        <p>${song.artist} • <span style="color:var(--accent-color)">Basado en tus gustos</span></p>
+                        <p>${song.artist}</p>
                     </div>
-                    <div style="background:var(--accent-color); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold; font-size:0.8rem;">▶</div>
+                    <div class="song-actions">
+                        <button class="action-btn" title="Descargar para modo offline" onclick='descargarCancion(event, ${JSON.stringify(song)})'>📥</button>
+                        <button class="action-btn play" title="Reproducir">▶</button>
+                    </div>
                 `;
                 item.onclick = () => reproducirCancion(song);
                 listContainer.appendChild(item);
@@ -180,62 +288,40 @@
             
             const player = document.getElementById('audioPlayer');
             player.src = song.url;
-            player.play().catch(err => console.log("Reproducción pausada por políticas del navegador:", err));
+            player.play().catch(err => console.log("Reproducción pausada:", err));
+
+            registrarHistorialReproduccion(song);
         }
 
+        let timerBusqueda;
         function filtrarCanciones() {
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            
-            if (query.length > 1) {
-                registrarInteraccion(query);
-            }
+            clearTimeout(timerBusqueda);
+            const query = document.getElementById('searchInput').value.trim();
 
-            const filtradas = playlist.filter(s => 
-                s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query) || s.genre.toLowerCase().includes(query)
-            );
-            
-            if (query === "") {
-                cargarSugerenciasIntuitivas();
-            } else {
-                document.getElementById('sectionTitle').innerText = "Resultados de búsqueda";
-                cargarListaResultados(filtradas);
-            }
-        }
-
-        function cargarListaResultados(canciones) {
-            const listContainer = document.getElementById('songList');
-            listContainer.innerHTML = '';
-            
-            if (canciones.length === 0) {
-                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se encontraron canciones.</p>';
+            if (query.length === 0) {
+                cambiarPestana('home');
                 return;
             }
 
-            canciones.forEach(song => {
-                const item = document.createElement('div');
-                item.className = 'song-item';
-                item.innerHTML = `
-                    <div class="song-info">
-                        <h4>${song.title}</h4>
-                        <p>${song.artist}</p>
-                    </div>
-                    <div style="background:var(--accent-color); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold; font-size:0.8rem;">▶</div>
-                `;
-                item.onclick = () => reproducirCancion(song);
-                listContainer.appendChild(item);
-            });
+            if (query.length > 2 && !busquedasRecientes.includes(query)) {
+                busquedasRecientes.unshift(query);
+                if (busquedasRecientes.length > 5) busquedasRecientes.pop();
+                localStorage.setItem('historial_busquedas', JSON.stringify(busquedasRecientes));
+            }
+
+            timerBusqueda = setTimeout(() => {
+                if (pestanaActual === 'history') cambiarPestana('home');
+                buscarMusicaJamendo(query, "Resultados de búsqueda");
+            }, 500);
         }
 
         cargarSugerenciasIntuitivas();
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log("Service Worker registrado:", reg.scope))
-                    .catch(err => console.error("Error Service Worker:", err));
+                navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
             });
         }
     </script>
 </body>
 </html>
-
