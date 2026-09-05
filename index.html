@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Spotify PWA - Piped Stream</title>
+    <title>Spotify Web Lite - Streaming Completo</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -107,19 +107,19 @@
             align-items: center;
         }
         .action-btn {
-            background: #2a2a2a;
+            background: var(--accent-color);
             border: none;
             border-radius: 50%;
-            width: 32px;
-            height: 32px;
+            width: 34px;
+            height: 34px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            color: white;
+            color: black;
+            font-weight: bold;
             font-size: 0.9rem;
         }
-        .action-btn.play { background: var(--accent-color); color: black; font-weight: bold; }
         
         .player-bar {
             position: fixed;
@@ -156,25 +156,25 @@
 <body>
 
     <header>
-        <h1>Spotify Web Lite (Piped Stream)</h1>
+        <h1>Spotify Web Lite</h1>
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Busca tus canciones completas favoritas..." oninput="filtrarCanciones()">
+            <input type="text" id="searchInput" placeholder="Busca cualquier artista, álbum o canción..." oninput="filtrarCanciones()">
         </div>
         <div class="nav-tabs">
             <button class="tab-btn active" id="tabHome" onclick="cambiarPestana('home')">Inicio / Sugerencias</button>
-            <button class="tab-btn" id="tabHistory" onclick="cambiarPestana('history')">Historial Escuchadas</button>
+            <button class="tab-btn" id="tabHistory" onclick="cambiarPestana('history')">Historial</button>
         </div>
         <div class="categories-bar">
-            <span class="cat-chip" onclick="filtrarPorCategory('Top hits 2026')">Top Hits</span>
-            <span class="cat-chip" onclick="filtrarPorCategory('Bad Bunny full album')">Reggaeton</span>
-            <span class="cat-chip" onclick="filtrarPorCategory('Rock full songs')">Rock</span>
+            <span class="cat-chip" onclick="filtrarPorCategory('Top global hits 2026')">Top Global</span>
+            <span class="cat-chip" onclick="filtrarPorCategory('Reggaeton mix 2026')">Reggaeton</span>
+            <span class="cat-chip" onclick="filtrarPorCategory('Rock classics full songs')">Rock</span>
             <span class="cat-chip" onclick="filtrarPorCategory('Pop hits 2026')">Pop</span>
-            <span class="cat-chip" onclick="filtrarPorCategory('Lofi hip hop radio')">Lofi</span>
+            <span class="cat-chip" onclick="filtrarPorCategory('Lofi hip hop beats')">Lofi</span>
         </div>
     </header>
 
     <div class="container">
-        <h3 id="sectionTitle">Música comercial sugerida</h3>
+        <h3 id="sectionTitle">Música sugerida</h3>
         <div class="song-list" id="songList"></div>
     </div>
 
@@ -185,8 +185,8 @@
                 <p id="currentArtist" style="margin:0; font-size:0.8rem; color:var(--text-secondary);">-</p>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <span id="loadingAudio" class="loading-spinner">Cargando canción completa...</span>
-                <span class="offline-badge">Piped Stream</span>
+                <span id="loadingAudio" class="loading-spinner">Cargando audio...</span>
+                <span class="offline-badge">Stream Activo</span>
             </div>
         </div>
         <audio id="audioPlayer" controls></audio>
@@ -197,11 +197,12 @@
         let historialReproduccion = JSON.parse(localStorage.getItem('historial_reproducidas')) || [];
         let busquedasRecientes = JSON.parse(localStorage.getItem('historial_busquedas')) || [];
 
-        // Lista de servidores de respaldo oficiales de Piped
+        // Lista actualizada y ampliada de instancias activas de Piped
         const PIPED_INSTANCES = [
-            'https://pipedapi.kavin.rocks',
-            'https://api.piped.privacy.com.de',
-            'https://pipedapi.yt.art.garden'
+            'https://api.piped.private.coffee',
+            'https://pipedapi.adminforge.de',
+            'https://api.piped.projectsegfau.lt',
+            'https://pipedapi.kavin.rocks'
         ];
         let currentInstanceIndex = 0;
 
@@ -209,16 +210,18 @@
             for (let i = 0; i < PIPED_INSTANCES.length; i++) {
                 let instance = PIPED_INSTANCES[(currentInstanceIndex + i) % PIPED_INSTANCES.length];
                 try {
-                    const response = await fetch(`${instance}${endpoint}`);
+                    const response = await fetch(`${instance}${endpoint}`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
                     if (response.ok) {
                         currentInstanceIndex = (currentInstanceIndex + i) % PIPED_INSTANCES.length;
                         return await response.json();
                     }
                 } catch (e) {
-                    console.warn(`Instancia ${instance} falló, intentando con otra...`);
+                    console.warn(`Instancia ${instance} no disponible, probando siguiente...`);
                 }
             }
-            throw new Error("Todas las instancias de Piped no están disponibles.");
+            throw new Error("Todas las instancias están ocupadas.");
         }
 
         function cambiarPestana(tipo) {
@@ -234,7 +237,7 @@
         }
 
         function registrarHistorialReproduccion(song) {
-            historialReproduccion = historialReproduccion.filter(s => s.url !== song.url);
+            historialReproduccion = historialReproduccion.filter(s => s.videoId !== song.videoId);
             historialReproduccion.unshift(song);
             if (historialReproduccion.length > 50) historialReproduccion.pop();
             localStorage.setItem('historial_reproducidas', JSON.stringify(historialReproduccion));
@@ -242,9 +245,9 @@
 
         async function cargarSugerenciasIntuitivas() {
             if (pestanaActual !== 'home') return;
-            document.getElementById('sectionTitle').innerText = "Música comercial sugerida";
-            let termino = busquedasRecientes.length > 0 ? busquedasRecientes[0] : "Top hits 2026";
-            buscarMusica(termino, "Sugeridas basadas en tus búsquedas");
+            document.getElementById('sectionTitle').innerText = "Música sugerida";
+            let termino = busquedasRecientes.length > 0 ? busquedasRecientes[0] : "Top global hits 2026";
+            buscarMusica(termino, "Basado en tus gustos");
         }
 
         function filtrarPorCategory(categoria) {
@@ -254,15 +257,15 @@
         }
 
         function mostrarHistorial() {
-            document.getElementById('sectionTitle').innerText = "Historial de canciones escuchadas";
-            renderizarLista(historialReproduccion, "No tienes canciones en tu historial aún. ¡Empieza a reproducir música!");
+            document.getElementById('sectionTitle').innerText = "Historial de reproducción";
+            renderizarLista(historialReproduccion, "Aún no has reproducido ninguna canción.");
         }
 
         async function buscarMusica(query, tituloSeccion) {
             if (pestanaActual !== 'home') return;
             document.getElementById('sectionTitle').innerText = tituloSeccion;
             const listContainer = document.getElementById('songList');
-            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando canciones completas...</p>';
+            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando música...</p>';
 
             try {
                 const data = await fetchWithFallback(`/search?q=${encodeURIComponent(query)}&filter=videos`);
@@ -275,18 +278,18 @@
                     return {
                         videoId: videoId,
                         title: item.title,
-                        artist: item.uploaderName,
+                        artist: item.uploaderName || 'Artista desconocido',
                         duration: item.duration
                     };
                 }).filter(s => s.videoId);
 
                 renderizarLista(cancionesFormateadas);
             } catch (error) {
-                listContainer.innerHTML = '<p style="color:var(--text-secondary);">Error al conectar con los servidores de streaming. Intenta de nuevo.</p>';
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">Error de conexión con los servidores. Vuelve a intentar en unos segundos.</p>';
             }
         }
 
-        function renderizarLista(canciones, mensajeVacio = "No se encontraron canciones.") {
+        function renderizarLista(canciones, mensajeVacio = "No se encontraron resultados.") {
             const listContainer = document.getElementById('songList');
             listContainer.innerHTML = '';
             
@@ -304,7 +307,7 @@
                         <p>${song.artist}</p>
                     </div>
                     <div class="song-actions">
-                        <button class="action-btn play" title="Reproducir canción completa">▶</button>
+                        <button class="action-btn" title="Reproducir">▶</button>
                     </div>
                 `;
                 item.onclick = () => obtenerAudioYReproducir(song);
@@ -322,19 +325,19 @@
                 const audioStreams = data.audioStreams || [];
                 
                 if (audioStreams.length > 0) {
+                    // Seleccionamos el flujo de audio con mejor estabilidad
                     const streamUrl = audioStreams[0].url;
                     
                     const player = document.getElementById('audioPlayer');
                     player.src = streamUrl;
-                    player.play().catch(err => console.log("Error al reproducir audio:", err));
+                    player.play().catch(err => console.log("Reproducción bloqueada por autoplay:", err));
                     
-                    song.url = streamUrl;
                     registrarHistorialReproduccion(song);
                 } else {
-                    alert("No se encontró un flujo de audio completo para este título.");
+                    alert("No se encontró el flujo de audio para este archivo.");
                 }
             } catch (e) {
-                alert("Error al cargar la pista completa desde los servidores.");
+                alert("No se pudo cargar la pista completa. Intenta con otra canción.");
             } finally {
                 document.getElementById('loadingAudio').style.display = 'none';
             }
@@ -372,4 +375,3 @@
     </script>
 </body>
 </html>
-
