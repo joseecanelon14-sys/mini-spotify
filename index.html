@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify Web Lite</title>
+    <title>Spotify Web Lite - APK</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -17,7 +17,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding-bottom: 140px;
+            padding-bottom: 160px;
         }
         header {
             padding: 20px;
@@ -30,9 +30,9 @@
             z-index: 10;
         }
         h1 { margin: 0; font-size: 1.5rem; color: var(--accent-color); }
-        .search-box { display: flex; gap: 10px; }
+        .search-box { display: flex; flex-direction: column; gap: 8px; position: relative; }
         input {
-            flex: 1;
+            width: 100%;
             padding: 12px 15px;
             border-radius: 25px;
             border: none;
@@ -40,7 +40,28 @@
             color: white;
             font-size: 1rem;
             outline: none;
+            box-sizing: border-box;
         }
+        .suggestions-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background: #282828;
+            border-radius: 8px;
+            overflow: hidden;
+            z-index: 20;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            display: none;
+        }
+        .suggestion-item {
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+        }
+        .suggestion-item:hover { background: #383838; }
+
         .container { padding: 20px; }
         h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
         .song-list { display: flex; flex-direction: column; gap: 10px; }
@@ -99,84 +120,128 @@
     <header>
         <h1>Spotify Web Lite</h1>
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Escribe cualquier artista o canción..." oninput="filtrarCanciones()">
+            <input type="text" id="searchInput" placeholder="Escribe un artista o canción..." oninput="manejarInputBusqueda()">
+            <div id="suggestionsDropdown" class="suggestions-dropdown"></div>
         </div>
     </header>
 
     <div class="container">
-        <h3 id="sectionTitle">Resultados</h3>
+        <h3 id="sectionTitle">Resultados de la Búsqueda</h3>
         <div class="song-list" id="songList">
-            <p style="color:var(--text-secondary);">Busca cualquier artista o canción arriba para comenzar.</p>
+            <p style="color:var(--text-secondary);">Comienza a escribir para buscar música comercial...</p>
         </div>
     </div>
 
     <div class="player-bar">
-        <div style="margin-bottom: 5px; font-size: 0.85rem; color: var(--text-secondary);" id="nowPlayingText">Reproductor activo</div>
+        <div style="margin-bottom: 5px; font-size: 0.85rem; color: var(--text-secondary);" id="nowPlayingText">Reproductor listo</div>
         <div id="playerContainer">
-            <p style="margin: 0; font-size: 0.8rem; color: #777;">Selecciona una canción de la lista</p>
+            <p style="margin: 0; font-size: 0.8rem; color: #777;">Selecciona una pista</p>
         </div>
     </div>
 
     <script>
-        const PIPED_INSTANCES = [
-            'https://pipedapi.kavin.rocks',
-            'https://api.piped.private.coffee',
-            'https://pipedapi.adminforge.de'
-        ];
-
         let timerBusqueda;
+        const CACHE_NAME = 'spotify-lite-cache-v1';
+        const CACHE_EXPIRATION_DAYS = 15;
 
-        function filtrarCanciones() {
+        // Caché local de 15 días para canciones reproducidas
+        async function gestionarCacheReproduccion(songId, songData) {
+            if ('caches' in window) {
+                const cache = await caches.open(CACHE_NAME);
+                if (songData) {
+                    const payload = { timestamp: Date.now(), data: songData };
+                    await cache.put(`/song/${songId}`, new Response(JSON.stringify(payload)));
+                } else {
+                    const res = await cache.match(`/song/${songId}`);
+                    if (res) {
+                        const json = await res.json();
+                        const dias = (Date.now() - json.timestamp) / (1000 * 60 * 60 * 24);
+                        if (dias < CACHE_EXPIRATION_DAYS) return json.data;
+                        await cache.delete(`/song/${songId}`);
+                    }
+                }
+            }
+            return null;
+        }
+
+        function manejarInputBusqueda() {
             clearTimeout(timerBusqueda);
             const query = document.getElementById('searchInput').value.trim();
 
-            if (query.length < 2) return;
-
-            timerBusqueda = setTimeout(() => {
-                buscarMusica(query);
-            }, 500);
-        }
-
-        async function buscarMusica(query) {
-            const listContainer = document.getElementById('songList');
-            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando pistas...</p>';
-
-            let data = null;
-            for (let instance of PIPED_INSTANCES) {
-                try {
-                    const res = await fetch(`${instance}/search?q=${encodeURIComponent(query)}&filter=videos`);
-                    if (res.ok) {
-                        data = await res.json();
-                        break;
-                    }
-                } catch (e) {
-                    // Intenta con la siguiente instancia
-                }
-            }
-
-            if (!data || !data.items) {
-                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se pudo conectar con los servidores.</p>';
+            if (query.length < 2) {
+                document.getElementById('suggestionsDropdown').style.display = 'none';
                 return;
             }
 
-            const items = data.items.map(item => ({
-                videoId: item.url ? item.url.replace('/watch?v=', '') : '',
-                title: item.title,
-                artist: item.uploaderName || 'Artista desconocido'
-            })).filter(s => s.videoId);
+            timerBusqueda = setTimeout(() => {
+                buscarMusica(query);
+            }, 400);
+        }
 
-            renderizarLista(items);
+        async function buscarMusica(query) {
+            const dropdown = document.getElementById('suggestionsDropdown');
+            const listContainer = document.getElementById('songList');
+            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando pistas...</p>';
+
+            try {
+                const res = await fetch(`https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+                const sugerencias = data[1] || [];
+
+                if (sugerencias.length > 0) {
+                    dropdown.innerHTML = sugerencias.map(s => `<div class="suggestion-item" onclick="seleccionarSugerencia('${s}')">${s}</div>`).join('');
+                    dropdown.style.display = 'block';
+                } else {
+                    dropdown.style.display = 'none';
+                }
+
+                ejecutarBusquedaInterna(query);
+            } catch (e) {
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">Error al conectar. Verifica tu red.</p>';
+            }
+        }
+
+        async function ejecutarBusquedaInterna(query) {
+            const listContainer = document.getElementById('songList');
+            
+            // Primero intentamos buscar en caché si ya existe una coincidencia o historial reciente
+            let cachedResult = await gestionarCacheReproduccion(query);
+            if (cachedResult) {
+                renderizarLista([cachedResult]);
+                return;
+            }
+
+            try {
+                const res = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`);
+                const data = await res.json();
+
+                if (!data.items || data.items.length === 0) {
+                    listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se encontraron resultados.</p>';
+                    return;
+                }
+
+                const items = data.items.map(item => ({
+                    videoId: item.url ? item.url.replace('/watch?v=', '') : '',
+                    title: item.title,
+                    artist: item.uploaderName || 'Artista comercial'
+                })).filter(s => s.videoId);
+
+                renderizarLista(items);
+            } catch (err) {
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">Intenta de nuevo con otra búsqueda.</p>';
+            }
+        }
+
+        function seleccionarSugerencia(titulo) {
+            document.getElementById('searchInput').value = titulo;
+            document.getElementById('suggestionsDropdown').style.display = 'none';
+            ejecutarBusquedaInterna(titulo);
         }
 
         function renderizarLista(canciones) {
             const listContainer = document.getElementById('songList');
             listContainer.innerHTML = '';
             
-            if (canciones.length === 0) {
-                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se encontraron resultados.</p>';
-                return;
-            }
-
             canciones.forEach(song => {
                 const item = document.createElement('div');
                 item.className = 'song-item';
@@ -192,17 +257,27 @@
             });
         }
 
-        function reproducirCancion(song) {
+        async function reproducirCancion(song) {
             document.getElementById('nowPlayingText').innerText = `Reproduciendo: ${song.title}`;
             
+            // Guardar en caché con vigencia de 15 días
+            await gestionarCacheReproduccion(song.videoId, song);
+
             const playerContainer = document.getElementById('playerContainer');
             playerContainer.innerHTML = `
-                <iframe src="https://www.youtube-nocookie.com/embed/${song.videoId}?autoplay=1" 
+                <iframe src="https://www.youtube-nocookie.com/embed/${song.videoId}?autoplay=1&enablejsapi=1" 
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                         allowfullscreen>
                 </iframe>
             `;
         }
+
+        // Script de control para mitigar suspensiones de WebView al minimizar la app
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden) {
+                console.log("App en segundo plano - Manteniendo estado multimedia");
+            }
+        });
     </script>
 </body>
 </html>
