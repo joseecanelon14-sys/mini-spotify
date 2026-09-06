@@ -3,96 +3,238 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reproductor YouTube iFrame</title>
+    <title>Spotify Web Lite - Reproductor Directo</title>
+    <link rel="manifest" href="manifest.json">
     <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #181818;
+            --accent-color: #1db954;
+            --text-color: #ffffff;
+            --text-secondary: #b3b3b3;
+        }
         body {
-            font-family: sans-serif;
-            background-color: #121212;
-            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
+            padding-bottom: 140px;
+        }
+        header {
             padding: 20px;
+            background-color: var(--surface-color);
             display: flex;
             flex-direction: column;
-            align-items: center;
+            gap: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
-        .player-container {
-            position: relative;
-            width: 100%;
-            max-width: 560px;
-            aspect-ratio: 16/9;
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        }
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        .controls {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            width: 100%;
-            max-width: 560px;
-        }
+        h1 { margin: 0; font-size: 1.5rem; color: var(--accent-color); }
+        .search-box { display: flex; gap: 10px; }
         input {
             flex: 1;
-            padding: 12px;
-            border-radius: 8px;
+            padding: 12px 15px;
+            border-radius: 25px;
             border: none;
             background: #2a2a2a;
             color: white;
             font-size: 1rem;
             outline: none;
         }
-        button {
-            padding: 0 20px;
+        .container { padding: 20px; }
+        h3 { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+        .song-list { display: flex; flex-direction: column; gap: 10px; }
+        .song-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--surface-color);
+            padding: 12px 15px;
             border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .song-item:active { background: #282828; }
+        .song-info { flex: 1; overflow: hidden; padding-right: 10px; }
+        .song-info h4 { margin: 0 0 5px 0; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .song-info p { margin: 0; font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .action-btn {
+            background: var(--accent-color);
             border: none;
-            background: #1db954;
+            border-radius: 50%;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
             color: black;
             font-weight: bold;
-            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .player-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #181818;
+            border-top: 1px solid #282828;
+            padding: 15px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-sizing: border-box;
+            z-index: 100;
+        }
+        .player-details { display: flex; justify-content: space-between; align-items: center; }
+        audio { width: 100%; }
+        .loading-spinner {
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            display: none;
         }
     </style>
 </head>
 <body>
 
-    <h1>Reproductor iFrame</h1>
+    <header>
+        <h1>Spotify Web Lite</h1>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Escribe cualquier artista o canción..." oninput="filtrarCanciones()">
+        </div>
+    </header>
 
-    <div class="player-container">
-        <!-- El iframe cargará el video de YouTube -->
-        <iframe id="youtubePlayer" src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    <div class="container">
+        <h3 id="sectionTitle">Resultados</h3>
+        <div class="song-list" id="songList">
+            <p style="color:var(--text-secondary);">Busca cualquier artista o canción arriba para comenzar.</p>
+        </div>
     </div>
 
-    <div class="controls">
-        <input type="text" id="videoUrl" placeholder="Pega el ID o URL de YouTube...">
-        <button onclick="cambiarVideo()">Reproducir</button>
+    <div class="player-bar">
+        <div class="player-details">
+            <div>
+                <strong id="currentTitle">Selecciona una canción</strong>
+                <p id="currentArtist" style="margin:0; font-size:0.8rem; color:var(--text-secondary);">-</p>
+            </div>
+            <span id="loadingAudio" class="loading-spinner">Cargando flujo...</span>
+        </div>
+        <audio id="audioPlayer" controls></audio>
     </div>
 
     <script>
-        function cambiarVideo() {
-            const input = document.getElementById('videoUrl').value.trim();
-            let videoId = '';
+        // Instancias robustas optimizadas para streaming web directo sin bloqueos CORS de Piped/Cobalt
+        const INSTANCES = [
+            'https://pipedapi.kavin.rocks',
+            'https://api.piped.private.coffee',
+            'https://pipedapi.adminforge.de',
+            'https://api.piped.projectsegfau.lt',
+            'https://pipedapi.smnz.de'
+        ];
 
-            if (input.includes('youtube.com') || input.includes('youtu.be')) {
-                // Extraer el ID si pegan la URL completa
-                const match = input.match(/(?:v=|youtu\.be\/)([\w-]{11})/);
-                if (match) videoId = match[1];
-            } else if (input.length === 11) {
-                videoId = input; // Si pegan directamente el ID de 11 caracteres
+        let timerBusqueda;
+
+        function filtrarCanciones() {
+            clearTimeout(timerBusqueda);
+            const query = document.getElementById('searchInput').value.trim();
+
+            if (query.length < 2) return;
+
+            timerBusqueda = setTimeout(() => {
+                buscarMusica(query);
+            }, 500);
+        }
+
+        async function buscarMusica(query) {
+            const listContainer = document.getElementById('songList');
+            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando pistas completas...</p>';
+
+            let data = null;
+            for (let instance of INSTANCES) {
+                try {
+                    const res = await fetch(`${instance}/search?q=${encodeURIComponent(query)}&filter=videos`);
+                    if (res.ok) {
+                        data = await res.json();
+                        break;
+                    }
+                } catch (e) {
+                    // Intenta con el siguiente servidor de la lista automáticamente
+                }
             }
 
-            if (videoId) {
-                const iframe = document.getElementById('youtubePlayer');
-                iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+            if (!data || !data.items) {
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se pudo conectar con los servidores de búsqueda.</p>';
+                return;
+            }
+
+            const items = data.items.map(item => ({
+                videoId: item.url ? item.url.replace('/watch?v=', '') : '',
+                title: item.title,
+                artist: item.uploaderName || 'Artista desconocido'
+            })).filter(s => s.videoId);
+
+            renderizarLista(items);
+        }
+
+        function renderizarLista(canciones) {
+            const listContainer = document.getElementById('songList');
+            listContainer.innerHTML = '';
+            
+            if (canciones.length === 0) {
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se encontraron resultados.</p>';
+                return;
+            }
+
+            canciones.forEach(song => {
+                const item = document.createElement('div');
+                item.className = 'song-item';
+                item.innerHTML = `
+                    <div class="song-info">
+                        <h4>${song.title}</h4>
+                        <p>${song.artist}</p>
+                    </div>
+                    <button class="action-btn">▶</button>
+                `;
+                item.onclick = () => reproducirCancion(song);
+                listContainer.appendChild(item);
+            });
+        }
+
+        async function reproducirCancion(song) {
+            document.getElementById('currentTitle').innerText = song.title;
+            document.getElementById('currentArtist').innerText = song.artist;
+            document.getElementById('loadingAudio').style.display = 'inline';
+
+            let audioUrl = null;
+            for (let instance of INSTANCES) {
+                try {
+                    const res = await fetch(`${instance}/streams/${song.videoId}`);
+                    if (res.ok) {
+                        const streamData = await res.json();
+                        if (streamData.audioStreams && streamData.audioStreams.length > 0) {
+                            // Filtramos el mejor flujo de audio disponible completo
+                            audioUrl = streamData.audioStreams[0].url;
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    // Salta al siguiente servidor si el actual rechaza el stream
+                }
+            }
+
+            document.getElementById('loadingAudio').style.display = 'none';
+
+            if (audioUrl) {
+                const player = document.getElementById('audioPlayer');
+                player.src = audioUrl;
+                player.play().catch(err => console.log("Autoplay bloqueado:", err));
             } else {
-                alert('Por favor, ingresa una URL o ID de YouTube válido.');
+                alert("Este archivo de audio está protegido o el servidor está saturado. Intenta con otra canción.");
             }
         }
     </script>
-
 </body>
 </html>
