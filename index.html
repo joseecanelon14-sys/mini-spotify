@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify Web Lite - Reproductor Directo</title>
-    <link rel="manifest" href="manifest.json">
+    <title>Spotify Web Lite - Reproductor Integrado</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -18,7 +17,7 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             margin: 0;
-            padding-bottom: 140px;
+            padding-bottom: 120px;
         }
         header {
             padding: 20px;
@@ -82,19 +81,18 @@
             width: 100%;
             background: #181818;
             border-top: 1px solid #282828;
-            padding: 15px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            padding: 10px 20px;
             box-sizing: border-box;
             z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        .player-details { display: flex; justify-content: space-between; align-items: center; }
-        audio { width: 100%; }
-        .loading-spinner {
-            font-size: 0.85rem;
-            color: var(--accent-color);
-            display: none;
+        iframe {
+            width: 100%;
+            height: 80px;
+            border: none;
+            border-radius: 8px;
         }
     </style>
 </head>
@@ -115,24 +113,18 @@
     </div>
 
     <div class="player-bar">
-        <div class="player-details">
-            <div>
-                <strong id="currentTitle">Selecciona una canción</strong>
-                <p id="currentArtist" style="margin:0; font-size:0.8rem; color:var(--text-secondary);">-</p>
-            </div>
-            <span id="loadingAudio" class="loading-spinner">Cargando flujo...</span>
+        <div style="width: 100%; margin-bottom: 5px; font-size: 0.85rem; color: var(--text-secondary);" id="nowPlayingText">Reproductor activo</div>
+        <!-- Contenedor embebido nativo que reproduce la pista completa sin bloqueos CORS -->
+        <div id="playerContainer" style="width: 100%;">
+            <p style="margin: 0; font-size: 0.8rem; color: #777;">Selecciona una canción de la lista</p>
         </div>
-        <audio id="audioPlayer" controls></audio>
     </div>
 
     <script>
-        // Instancias robustas optimizadas para streaming web directo sin bloqueos CORS de Piped/Cobalt
-        const INSTANCES = [
+        const PIPED_INSTANCES = [
             'https://pipedapi.kavin.rocks',
             'https://api.piped.private.coffee',
-            'https://pipedapi.adminforge.de',
-            'https://api.piped.projectsegfau.lt',
-            'https://pipedapi.smnz.de'
+            'https://pipedapi.adminforge.de'
         ];
 
         let timerBusqueda;
@@ -150,10 +142,10 @@
 
         async function buscarMusica(query) {
             const listContainer = document.getElementById('songList');
-            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando pistas completas...</p>';
+            listContainer.innerHTML = '<p style="color:var(--text-secondary);">Buscando pistas...</p>';
 
             let data = null;
-            for (let instance of INSTANCES) {
+            for (let instance of PIPED_INSTANCES) {
                 try {
                     const res = await fetch(`${instance}/search?q=${encodeURIComponent(query)}&filter=videos`);
                     if (res.ok) {
@@ -161,12 +153,12 @@
                         break;
                     }
                 } catch (e) {
-                    // Intenta con el siguiente servidor de la lista automáticamente
+                    // Intenta con la siguiente instancia
                 }
             }
 
             if (!data || !data.items) {
-                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se pudo conectar con los servidores de búsqueda.</p>';
+                listContainer.innerHTML = '<p style="color:var(--text-secondary);">No se pudo conectar con los servidores.</p>';
                 return;
             }
 
@@ -203,37 +195,17 @@
             });
         }
 
-        async function reproducirCancion(song) {
-            document.getElementById('currentTitle').innerText = song.title;
-            document.getElementById('currentArtist').innerText = song.artist;
-            document.getElementById('loadingAudio').style.display = 'inline';
-
-            let audioUrl = null;
-            for (let instance of INSTANCES) {
-                try {
-                    const res = await fetch(`${instance}/streams/${song.videoId}`);
-                    if (res.ok) {
-                        const streamData = await res.json();
-                        if (streamData.audioStreams && streamData.audioStreams.length > 0) {
-                            // Filtramos el mejor flujo de audio disponible completo
-                            audioUrl = streamData.audioStreams[0].url;
-                            break;
-                        }
-                    }
-                } catch (e) {
-                    // Salta al siguiente servidor si el actual rechaza el stream
-                }
-            }
-
-            document.getElementById('loadingAudio').style.display = 'none';
-
-            if (audioUrl) {
-                const player = document.getElementById('audioPlayer');
-                player.src = audioUrl;
-                player.play().catch(err => console.log("Autoplay bloqueado:", err));
-            } else {
-                alert("Este archivo de audio está protegido o el servidor está saturado. Intenta con otra canción.");
-            }
+        function reproducirCancion(song) {
+            document.getElementById('nowPlayingTextinnerHTML').innerText = `Reproduciendo: ${song.title}`;
+            
+            // Usamos un reproductor integrado optimizado para web móvil que elude las restricciones de red
+            const playerContainer = document.getElementById('playerContainer');
+            playerContainer.innerHTML = `
+                <iframe src="https://www.youtube-nocookie.com/embed/${song.videoId}?autoplay=1&enablejsapi=1" 
+                        allow="autoplay" 
+                        title="${song.title}">
+                </iframe>
+            `;
         }
     </script>
 </body>
